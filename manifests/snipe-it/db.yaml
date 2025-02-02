@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: db
+  namespace: snipe
+  labels:
+    app: db
+spec:
+  serviceName: db     
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db
+  template:
+    metadata:
+      labels:
+        app: db
+    spec:        
+      containers:
+      - name: db
+        image: mysql:5.6
+        # securityContext:
+        # runAsUser: 999     
+        # runAsGroup: 999              
+        ports:
+        - containerPort: 3306
+        volumeMounts:
+          - name: db-pv
+            mountPath: /var/lib/mysql
+        envFrom:
+          - secretRef:
+              name: db-secret
+        resources:
+          requests:
+            cpu: 0.5
+            memory: 512Mi
+          limits:
+            cpu: 1
+            memory: 1Gi            
+      volumes:
+      - name: db-pv
+        persistentVolumeClaim:
+          claimName: db-pvc
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: db-svc
+  labels:
+    app: db-svc
+  namespace: snipe  
+spec:
+  selector:
+    app: db
+  type: ClusterIP
+  ports:
+  - port: 3306
+    targetPort: 3306
+   
+  

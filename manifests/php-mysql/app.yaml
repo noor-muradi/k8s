@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+  labels:
+    app: app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+        app: app
+  template:
+    metadata:
+      labels:
+        app: app     
+    spec:
+      containers:  
+        - name: app
+          image: noormuradi/php-app
+          ports:
+          - containerPort: 80
+          envFrom:
+          - secretRef:
+             name: db-secret
+          volumeMounts:
+            - name: app-vol
+              mountPath: /var/www/html    
+      initContainers:  
+      - image: bitnami/git
+        imagePullPolicy: Always
+        name: clone-repo
+        command:
+        - /bin/sh
+        - -c
+        - |
+          git clone https://github.com/noor-muradi/php.git
+          mv /php/* /var/www/html
+        volumeMounts:
+        - mountPath: /var/www/html
+          name: app-vol
+      volumes:
+        - name: app-vol
+          persistentVolumeClaim:
+            claimName: app-vol-vc

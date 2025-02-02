@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: snipe
+  labels:
+    app: snipe
+  namespace: snipe
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: snipe
+  template:
+    metadata:
+      labels:
+        app: snipe
+    spec:
+      containers:
+      - name: snipe
+        image: snipe/snipe-it
+        resources:
+          requests:
+            cpu: 256m
+            memory: 256Mi
+          limits:
+            cpu: 850m
+            memory: 850Mi
+        livenessProbe:
+          failureThreshold: 12
+          httpGet:
+            path: /login
+            port: 80
+          initialDelaySeconds: 180
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        readinessProbe:
+          failureThreshold: 12
+          httpGet:
+            path: /login
+            port: 80
+          initialDelaySeconds: 180
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        ports:
+        - containerPort: 80
+        volumeMounts:
+          - name: snipe-pv
+            mountPath: /var/lib/snipeit
+        envFrom:
+          - secretRef:
+              name: snipe-secret
+      volumes:
+      - name: snipe-pv
+        persistentVolumeClaim:
+          claimName: snipe-pvc
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: snipe-svc
+  labels:
+    app: snipe
+  namespace: snipe
+spec:
+  ports:
+    - port: 80
+      name: snipe-http
+      targetPort: 80
+  selector:
+    app: snipe
+  type: ClusterIP

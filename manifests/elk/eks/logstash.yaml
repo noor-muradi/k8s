@@ -1,0 +1,260 @@
+apiVersion: logstash.k8s.elastic.co/v1alpha1
+kind: Logstash
+metadata:
+  name: logstash
+  namespace: elk
+spec:
+  podTemplate:
+    spec:
+      containers:
+      - name: logstash
+        resources:
+          limits:
+            memory: 4Gi
+            cpu: 1
+        envFrom:
+        - secretRef:
+            name: logstash-s3-secret
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: eks.amazonaws.com/nodegroup
+                operator: In
+                values:
+                - public-ng #node group name
+  version: 8.11.4
+  count: 1
+  config:
+    log.level: info
+    api.http.host: "0.0.0.0"
+    queue.type: memory
+  pipelinesRef:
+    secretName: logstash-pipeline
+  elasticsearchRefs:
+    - clusterName: es
+      name: elastic
+
+  services:
+    - name: beats
+      service:
+        spec:
+          ports:
+            - port: 5044
+              name: "ls"
+              protocol: TCP
+              targetPort: 5044
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: logstash-pipeline
+  namespace: elk
+stringData:
+  pipelines.yml: |-
+    - pipeline.id: "aws-alb"
+      config.string: |
+        input {
+          s3 {
+            bucket => "prod-elb-logs"
+            prefix => "alb-logs-1"
+            add_field => {
+              "doctype" => "aws-application-load-balancer"
+            }
+          }
+        }
+        filter {
+          if [doctype] == "aws-application-load-balancer" or [log_format] == "aws-application-load-balancer" {
+            grok {
+              match => [ "message", '%{NOTSPACE:request_type} %{TIMESTAMP_ISO8601:log_timestamp} %{NOTSPACE:alb-name} %{NOTSPACE:client} %{NOTSPACE:target} %{NOTSPACE:request_processing_time:float} %{NOTSPACE:target_processing_time:float} %{NOTSPACE:response_processing_time:float} %{NOTSPACE:elb_status_code} %{NOTSPACE:target_status_code:int} %{NOTSPACE:received_bytes:float} %{NOTSPACE:sent_bytes:float} %{QUOTEDSTRING:request} %{QUOTEDSTRING:user_agent} %{NOTSPACE:ssl_cipher} %{NOTSPACE:ssl_protocol} %{NOTSPACE:target_group_arn} %{QUOTEDSTRING:trace_id} "%{DATA:domain_name}" "%{DATA:chosen_cert_arn}" %{NUMBER:matched_rule_priority:int} %{TIMESTAMP_ISO8601:request_creation_time} "%{DATA:actions_executed}" "%{DATA:redirect_url}" "%{DATA:error_reason}"']
+            }
+
+            date {
+                  match => [ "log_timestamp", "ISO8601" ]
+            }
+            mutate {
+              gsub => [
+                "request", '"', "",
+                "trace_id", '"', "",
+                "user_agent", '"', ""
+              ]
+            }
+          }
+          if [request] {
+            grok {
+              match => ["request", "(%{NOTSPACE:http_method})? (%{NOTSPACE:http_uri})? (%{NOTSPACE:http_version})?"]
+            }
+          }
+          if [http_uri] {
+            grok {
+              match => ["http_uri", "(%{WORD:protocol})?(://)?(%{IPORHOST:domain})?(:)?(%{INT:http_port})?(%{GREEDYDATA:request_uri})?"]
+            }
+          }
+          if [client] {
+            grok {
+              match => ["client", "(%{IPORHOST:client_ip})?"]
+            }
+          }
+          #drop monitoring ip
+          if [client_ip] == "3.239.217.100"  {
+            drop {}
+          }
+          if [target_group_arn] {
+            grok {
+              match => [ "target_group_arn", "arn:aws:%{NOTSPACE:tg-arn_type}:%{NOTSPACE:tg-arn_region}:%{NOTSPACE:tg-arn_aws_account_id}:targetgroup\/%{NOTSPACE:tg-arn_target_group_name}\/%{NOTSPACE:tg-arn_target_group_id}" ]
+            }
+          }
+          if [client_ip] {
+            geoip {
+              source => "client_ip"
+              target => "geoip"
+            }
+          }
+          mutate {
+            add_field => {
+              "[geoip][location]" => "%{[geoip][geo][location][lat]},%{[geoip][geo][location][lon]}"
+              "ip" => "%{client_ip}"
+            }
+          }
+          mutate {
+            rename => { "[geoip][geo][country_name]" => "[geoip][country_name]" }
+            rename => { "[geoip][geo][region_name]" => "[geoip][region_name]" }
+            rename => { "[geoip][geo][city_name]" => "[geoip][city_name]" }
+          }
+          mutate {
+            convert => [ "response_processing_time", "float" ]
+            convert => [ "request_processing_time", "float" ]
+            convert => [ "target_processing_time", "float" ]
+            remove_field => [ "ecs","agent","host","cloud","@version","input","logs_type" ]
+          }
+          useragent {
+            source => "user_agent"
+            target => "ua"
+            remove_field => [ "[ua][minor]","[ua][major]","[ua][build]","[ua][patch]","[ua][os_minor]","[ua][os_major]" ]
+          }
+        }
+        output {
+          elasticsearch {
+            hosts => "${ES_ES_HOSTS}"
+            index => "prod-alb-0000001"
+            user => "logstash"
+            password => "mypass"
+            ssl => true
+            ssl_certificate_authorities => "${ES_ES_SSL_CERTIFICATE_AUTHORITY}"
+          }
+        }
+
+    - pipeline.id: "aws-cloudfront"
+      config.string: |
+        input {
+          s3 {
+            bucket => "prod-cloudfront-logs"
+            prefix => "app.example.com"
+          }
+        }
+
+        filter {
+          grok {
+            match => {"message" => "%{DATE_EU:date}\t%{TIME:time}\t%{GREEDYDATA:edge_location}\t(?:%{NUMBER:sent_bytes:int}|-)\t%{IPORHOST:client_ip}\t%{WORD:http_method}\t%{HOSTNAME:cf_domain}\t%{NOTSPACE:http_uri}\t%{NUMBER:status:int}\t%{GREEDYDATA:referrer}\t%{GREEDYDATA:User_Agent}\t%{GREEDYDATA:cs-uri-query}\t%{GREEDYDATA:cookies}\t%{WORD:x_edge_result_type}\t%{NOTSPACE:x_edge_request_id}\t%{HOSTNAME:domain}\t%{URIPROTO:protocol}\t%{INT:received_bytes:int}\t%{NUMBER:response_processing_time:float}\t%{GREEDYDATA:x_edge_response_result_type}\t%{GREEDYDATA:cs-protocol-version}\t%{GREEDYDATA:file-status}\t%{GREEDYDATA:fle-encrypted-fields}"}
+          }
+
+          #drop aws ip
+          if [client_ip] == "3.239.217.100"  {
+            drop {}
+          }
+          geoip {
+            source => "client_ip"
+            target => "geoip"
+          }
+          useragent {
+            source => "User_Agent"
+            target => "ua"
+            remove_field => [
+              "[ua][minor]",
+              "[ua][major]",
+              "[ua][build]",
+              "[ua][patch]",
+              "[ua][os_minor]",
+              "[ua][os_major]"
+            ]
+          }
+          mutate {
+            add_field => {
+              "[geoip][location]" => "%{[geoip][geo][location][lat]},%{[geoip][geo][location][lon]}"
+              "ip" => "%{client_ip}"
+            }
+          }
+          mutate {
+            rename => {
+              "[geoip][geo][country_name]" => "[geoip][country_name]"
+              "[geoip][geo][region_name]" => "[geoip][region_name]"
+              "[geoip][geo][city_name]" => "[geoip][city_name]"
+            }
+          }
+          mutate {
+            remove_field => [
+              "date",
+              "time",
+              "cookies",
+              "tags",
+              "x_edge_request_id",
+              "x_edge_response_result_type"
+            ]
+          }
+        }
+        output {
+          elasticsearch {
+            hosts => "${ES_ES_HOSTS}"
+            index => "example-cf-0000001"
+            user => "logstash"
+            password => "mypassword"
+            ssl => true
+            ssl_certificate_authorities => "${ES_ES_SSL_CERTIFICATE_AUTHORITY}"
+          }
+        }
+
+    - pipeline.id: "example-users"
+      config.string: |
+        input {
+          jdbc {
+            jdbc_driver_library => "/mnt/jdbc/driver/mysql-connector-j-9.1.0.jar"
+            jdbc_driver_class => "com.mysql.cj.jdbc.Driver"
+            jdbc_connection_string => "jdbc:mysql://xxxxxxxx.ap-south-1.rds.amazonaws.com:3306/exampleDB"
+            jdbc_user => "logstash"
+            jdbc_password => "abc123"
+            statement => "SELECT * FROM exampleTable WHERE created_on > :sql_last_value"
+            use_column_value => true
+            tracking_column => "created_on"
+            tracking_column_type => "timestamp"
+            last_run_metadata_path => "/usr/share/logstash/data/metadata/last_run_metadata"
+            schedule => "* * * * *"
+          }
+        }
+        filter {
+          mutate {
+            copy => { "created_on" => "@timestamp" }
+          }
+          date {
+            match => [ "created_on", "ISO8601" ]
+            target => "@timestamp"
+          }
+          mutate {
+            remove_field => [
+              "@version",
+              "tags"
+            ]
+          }
+        }
+        output {
+          elasticsearch {
+            hosts => "${ES_ES_HOSTS}"
+            index => "ggg-users-current"
+            document_id => "%{user_id}"
+            user => "logstash"
+            password => "abc123"
+            ssl => true
+            ssl_certificate_authorities => "${ES_ES_SSL_CERTIFICATE_AUTHORITY}"
+          }
+        }

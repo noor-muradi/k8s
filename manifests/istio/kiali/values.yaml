@@ -1,0 +1,90 @@
+istio_namespace: "" # default is where Kiali is installed
+
+auth:
+  openid:
+    # allowed_domains:
+    # - example.com
+    # additional_request_params:
+      # prompt: login
+    # client_id: "xxxx.apps.googleusercontent.com"
+    # disable_rbac: true
+    # issuer_uri: "https://accounts.google.com"
+    # scopes: ["email"]
+    # username_claim: "email"
+  # openshift: {}
+  strategy: "token"
+
+deployment:
+  # This only limits what Kiali will attempt to see, but Kiali Service Account has permissions to see everything.
+  # For more control over what the Kial Service Account can see, use the Kiali Operator
+  accessible_namespaces:
+  - "**"
+  #- "mynamespace"
+
+  affinity:
+    node: {}
+    pod: {}
+    pod_anti: {}
+
+  hpa:
+    api_version: "autoscaling/v2"
+    spec: {}
+
+  image_name: quay.io/kiali/kiali
+  image_pull_policy: "Always"
+  image_version: v1.76.0 # version like "v1.39" (see: https://quay.io/repository/kiali/kiali?tab=tags) or a digest hash
+  
+  node_selector: {}
+  pod_annotations: {}
+  pod_labels: {}
+  priority_class_name: ""
+  replicas: 1
+  resources:
+    requests:
+      cpu: "10m"
+      memory: "64Mi"
+    limits:
+      memory: "1Gi"
+      
+  secret_name: "kiali"
+  
+  tolerations: []
+  
+  version_label: v1.76.0 # v1.39 # v1.39.0 # see: https://quay.io/repository/kiali/kiali?tab=tags
+  view_only_mode: false
+
+external_services:
+  custom_dashboards:
+    enabled: true
+  istio:
+    root_namespace: ""
+  grafana:
+    url: "http://192.168.30.16"
+identity: {}
+  #cert_file:
+  #private_key_file:
+
+kiali_feature_flags:
+  certificates_information_indicators:
+    enabled: true
+    secrets:
+    - cacerts
+    - istio-ca-secret
+  clustering:
+    autodetect_secrets:
+      enabled: true
+      label: "kiali.io/multiCluster=true"
+    clusters: []
+  disabled_features: []
+  validations:
+    ignore: ["KIA1301"]
+
+login_token:
+  signing_key:
+
+server:
+  port: 20001
+  metrics_enabled: true
+  metrics_port: 9090
+  web_root: ""
+  web_fqdn: kiali.example.com

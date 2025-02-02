@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: blog-deployment
+spec:
+  selector:
+    matchLabels:
+      app: java-blog-app
+  template:
+    metadata:
+      labels:
+        app: java-blog-app
+    spec:
+      containers:
+      - name: java-blog-container
+        image: gcr.io/$PROJECT/java-blog:latest
+        ports:
+        - containerPort: 8080
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: java-blog-service
+spec:
+  type: ClusterIP
+  selector:
+    app: java-blog-app
+  ports:
+  - port: 80
+    targetPort: 8080

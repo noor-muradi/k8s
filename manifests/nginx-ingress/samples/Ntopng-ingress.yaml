@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ntopng-pfsense
+  namespace: default
+spec:
+  type: ExternalName
+  externalName: pfsense.example.localnet  #Ntopng host
+  ports:
+  - protocol: TCP
+    port: 3000  # Port on which the Ntopng is listening
+
+---
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ntopng-pfsense
+  namespace: default
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"  #Indicate backend uses HTTPS
+    nginx.ingress.kubernetes.io/proxy-ssl-insecure-verify: "true"  #Skip backend cert verification
+    cert-manager.io/cluster-issuer: "letsencrypt-cluster-production"
+spec:
+  tls:
+  - hosts:
+    - ntop.example.com
+    secretName: ntop-tls-prod
+  rules:
+    - host: ntop.example.com
+      http:
+        paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: ntopng-pfsense
+              port:
+                number: 3000

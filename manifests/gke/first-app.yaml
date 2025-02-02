@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: petclinic-deployment
+spec:
+  selector:
+    matchLabels:
+      app: petclinic-app 
+  template:
+    metadata:
+      labels:
+        app: petclinic-app
+    spec:
+      containers:
+      - name: petclinic-container
+        image: gcr.io/$PROJECT/petclinic:latest
+        ports:
+        - containerPort: 8085
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: petclinic-app-service
+spec:
+  type: ClusterIP
+  selector:
+    app: petclinic-app
+  ports:
+  - port: 80
+    targetPort: 8085                      

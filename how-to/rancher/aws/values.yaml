@@ -1,0 +1,64 @@
+rancherImage: rancher/rancher
+rancherImageTag: v2.9.1
+
+ingress:
+  enabled: true
+  includeDefaultExtraAnnotations: true
+  extraAnnotations:
+    alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:ap-south-1:xxxxxx"
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/group.name: "mgt-ingress"
+    external-dns.alpha.kubernetes.io/hostname: rancher.example.com
+  ingressClassName: "alb"
+  pathType: ImplementationSpecific
+  path: "/*"
+
+
+  # backend port number
+  servicePort: 80
+
+  tls:
+    source: rancher
+
+service:
+  type: "ClusterIP"
+
+replicas: 2
+
+# Set priorityClassName to avoid eviction
+priorityClassName: rancher-critical
+
+# Set pod resource requests/limits for Rancher.
+resources: {}
+
+hostname: rancher.example.com
+
+tls: external
+
+
+postDelete:
+  enabled: true
+  image:
+    repository: rancher/shell
+    tag: v0.1.24
+  namespaceList:
+  - cattle-fleet-system
+  - cattle-system
+  - rancher-operator-system
+  # Number of seconds to wait for an app to be uninstalled
+  timeout: 120
+  # by default, the job will fail if it fail to uninstall any of the apps
+  ignoreTimeoutError: false
+
+# Set a bootstrap password. If leave empty, a random password will be generated.
+bootstrapPassword: "abc123"
+
+livenessProbe:
+  initialDelaySeconds: 60
+  periodSeconds: 30
+readinessProbe:
+  initialDelaySeconds: 5
+  periodSeconds: 30
+

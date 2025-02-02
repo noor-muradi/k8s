@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: wordpress 
+  name: wp-db
+  labels:
+    app: wp-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wp-db
+  template:
+    metadata:
+      labels:
+        app: wp-db
+    spec:        
+      containers:
+      - name: wp-db
+        image: mysql
+        ports:
+        - containerPort: 3306
+        volumeMounts:
+          - name: data
+            mountPath: /var/lib/mysql
+          - name: config
+            mountPath: /etc/mysql/conf.d  
+        envFrom:
+          - secretRef:
+              name: db-secret
+        livenessProbe:
+          exec:
+            command:
+            - bash
+            - "-c"
+            - |
+              mysqladmin -uroot -p$MYSQL_ROOT_PASSWORD ping
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: db-vc
+      - name: config
+          configMap:
+            name: db-config

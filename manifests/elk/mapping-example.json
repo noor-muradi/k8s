@@ -1,0 +1,18 @@
+PUT products
+{
+  "mappings": {
+    "properties": {
+      "name": {
+        "type": "text",  // Full-text search capabilities
+        "fields": {
+          "keyword": {   // Exact match capabilities
+            "type": "keyword"
+          }
+        }
+      },
+      "year": {
+        "type": "integer"
+      }
+    }
+  }
+}

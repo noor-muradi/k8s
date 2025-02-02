@@ -1,0 +1,13 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: ServiceEntry
+metadata:
+  name: rds-access
+spec:
+  hosts:
+    - your-rds-endpoint.compute.amazonaws.com  # Replace with your RDS endpoint
+  ports:
+    - number: 3306  # Replace with your RDS port if different
+      name: tcp
+      protocol: TCP
+  location: MESH_EXTERNAL
+  resolution: DNS

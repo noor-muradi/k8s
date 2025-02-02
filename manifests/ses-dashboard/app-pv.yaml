@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: ses-dash-app-pv
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+  - ReadWriteMany
+  nfs:
+    server: fs-xxxxxx.efs.us-east-1.amazonaws.com
+    path: /eks/ses-dash/app
+    readOnly: false
+

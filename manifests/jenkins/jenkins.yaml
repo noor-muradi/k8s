@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: jenkins
+  name: jenkins
+  namespace: jenkins
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jenkins
+  template:
+    metadata:
+      labels:
+        app: jenkins
+    spec:
+      containers:
+      - image: jenkins/jenkins:lts
+        name: jenkins
+        resources:
+          requests:
+            memory: "800Mi"
+            cpu: "250m"
+          limits:
+            memory: "1.5Gi"
+            cpu: "850m"
+        livenessProbe:
+          failureThreshold: 12
+          httpGet:
+            path: /jenkins/login
+            port: 8080
+          initialDelaySeconds: 180
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        readinessProbe:
+          failureThreshold: 12
+          httpGet:
+            path: /jenkins/login
+            port: 8080
+          initialDelaySeconds: 180
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        env:
+         - name: JENKINS_OPTS
+           value: --prefix=/jenkins
+         - name: JENKINS_JAVA_OPTIONS
+           value: "-Djava.awt.headless=true -Dmail.smtp.starttls.enable=true"  
+        ports:
+          - containerPort: 8080     
+        volumeMounts:
+           - name: jenkins-data
+             mountPath: /var/jenkins_home
+      volumes:
+       - name: jenkins-data
+         persistentVolumeClaim:
+           claimName: jenkins-pvc       
+---
+       
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: jenkins
+  name: jenkins-svc
+  namespace: jenkins
+spec:
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app: jenkins

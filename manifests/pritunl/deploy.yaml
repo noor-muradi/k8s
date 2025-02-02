@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pritunl
+  namespace: pritunl
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pritunl
+  template:
+    metadata:
+      labels:
+        app: pritunl
+    spec:
+      containers:
+      - name: pritunl-c
+        image: jippi/pritunl:latest
+        securityContext:
+          privileged: true
+        ports:
+        - containerPort: 80
+        - containerPort: 443
+        - containerPort: 1194
+          protocol: UDP
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 256m
+            memory: 512Mi
+        volumeMounts:
+        - mountPath: /var/lib/pritunl
+          name: data
+        - mountPath: /var/lib/mongodb
+          name: mongodb
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: pritunl-data-pvc
+      - name: mongodb
+        persistentVolumeClaim:
+          claimName: pritunl-mongo-pvc

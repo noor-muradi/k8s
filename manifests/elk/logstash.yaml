@@ -1,0 +1,47 @@
+apiVersion: logstash.k8s.elastic.co/v1alpha1
+kind: Logstash
+metadata:
+  name: monitoring
+  namespace: elk
+spec:
+  volumeClaimTemplates:
+    - metadata:
+        name: logstash-data # Do not change this name unless you set up a volume mount for the data path.
+      spec:
+        volumeName: logstash-pv
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+  version: 8.9.1
+  count: 1
+  config:
+    log.level: info
+    api.http.host: "0.0.0.0"
+    queue.type: memory
+  pipelinesRef:
+    secretName: logstash-pipeline
+  elasticsearchRefs:
+    - clusterName: test
+      name: monitoring
+
+  services:
+    - name: internal-svc
+      service:
+        spec:
+          ports:
+            - port: 5044
+              name: "ls"
+              protocol: TCP
+              targetPort: 5044
+    - name: lb-svc
+      service:
+        spec:
+          type: LoadBalancer
+          ports:
+            - port: 5044
+              name: "ls"
+              protocol: TCP
+              targetPort: 5044
+

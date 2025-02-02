@@ -1,0 +1,211 @@
+### Grafana Section ###
+
+grafana:
+  enabled: true
+  namespaceOverride: ""
+
+  image:
+    registry: docker.io
+    repository: grafana/grafana
+    tag: "11.1.0"
+
+  assertNoLeakedSecrets: false
+
+  grafana.ini:
+    server:
+      root_url: https://grafana.example.com
+      enable_gzip: true
+    wall: true
+
+
+    auth.google:
+      enabled: true
+      allow_sign_up: true
+      auto_login: false
+      client_id: xxxxxxxxxxxxx.apps.googleusercontent.com
+      client_secret: xxxxxxxxxxxx
+      scopes: https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/cloud-identity.groups.readonly
+      auth_url: https://accounts.google.com/o/oauth2/v2/auth
+      token_url: https://oauth2.googleapis.com/token
+      api_url: https://openidconnect.googleapis.com/v1/userinfo
+      allowed_domains: example.com
+      hosted_domain: example.com
+      allowed_groups: group@example.com
+      approval_prompt: never
+      use_refresh_token: false
+      include_granted_scopes: true
+      use_pkce: true
+      signout_redirect_url: https://grafana.example.com
+
+    smtp:
+      enabled: true
+      host: email-smtp.us-east-1.amazonaws.com:587
+      from_address: "grafana@example.com"
+      from_name: "Grafana"
+      startTLS_policy: "MandatoryStartTLS"
+      skip_verify: true
+  smtp:
+    existingSecret: "grafana-smtp"
+    userKey: "user"
+    passwordKey: "password"
+        
+
+  persistence:
+    enabled: true
+    existingClaim: "grafana-pvc"
+    accessModes:
+    - ReadWriteMany
+
+  resources:
+    requests:
+      memory: 512Mi
+      cpu: 128m
+    limits:
+      memory: 1Gi
+      cpu: 256m
+
+  service:
+    type: "ClusterIP"
+
+
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+      - name: 'grafana-dashboards-kubernetes'
+        orgId: 1
+        folder: 'Kubernetes'
+        type: file
+        disableDeletion: true
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/grafana-dashboards-kubernetes
+  dashboards:
+    grafana-dashboards-kubernetes:
+      k8s-system-api-server:
+        url: https://raw.githubusercontent.com/dotdc/grafana-dashboards-kubernetes/master/dashboards/k8s-system-api-server.json
+        token: ''
+      k8s-system-coredns:
+        url: https://raw.githubusercontent.com/dotdc/grafana-dashboards-kubernetes/master/dashboards/k8s-system-coredns.json
+        token: ''
+      k8s-views-global:
+        url: https://raw.githubusercontent.com/dotdc/grafana-dashboards-kubernetes/master/dashboards/k8s-views-global.json
+        token: ''
+      k8s-views-namespaces:
+        url: https://raw.githubusercontent.com/dotdc/grafana-dashboards-kubernetes/master/dashboards/k8s-views-namespaces.json
+        token: ''
+      k8s-views-nodes:
+        url: https://raw.githubusercontent.com/dotdc/grafana-dashboards-kubernetes/master/dashboards/k8s-views-nodes.json
+        token: ''
+      k8s-views-pods:
+        url: https://raw.githubusercontent.com/dotdc/grafana-dashboards-kubernetes/master/dashboards/k8s-views-pods.json
+        token: ''
+
+  #default passowrd
+  adminPassword: "changeme"
+
+  #disable default dashboard
+  sidecar:
+    dashboards:
+      enabled: false
+    datasources:
+      enabled: true
+      defaultDatasourceEnabled: true
+      isDefaultDatasource: true
+      uid: prometheus
+      name: eks-monitoring
+      alertmanager:
+        enabled: false
+
+defaultRules:
+  create: false
+
+
+#### Prometheus Section ###
+
+prometheus:
+  enabled: true
+
+  prometheusSpec:
+    image:
+      registry: quay.io
+      repository: prometheus/prometheus
+      tag: v2.53.0
+      sha: ""
+    ## How long to retain metrics
+    retention: "10d"
+    ## Maximum size of metrics
+    ##
+    retentionSize: "30GB"
+
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: eks.amazonaws.com/nodegroup
+              operator: In
+              values:
+              - example-ng #node group name
+
+
+    storageSpec:
+      volumeClaimTemplate:
+        metadata:
+          name: prometheus-pvc
+        spec:
+          accessModes: ["ReadWriteMany"]
+          resources:
+            requests:
+              storage: 10Gi
+          volumeName: prometheus-pv
+          storageClassName: ""
+
+    resources:
+      requests:
+        memory: 512Mi
+        cpu: 128m
+      limits:
+        memory: 1.5Gi
+        cpu: 256m
+
+
+    additionalScrapeConfigs:
+
+    - job_name: node
+      scrape_interval: 5s
+      static_configs:
+      - targets: ['172.40.6.220:9100'] #jenkins-agent
+        labels:
+          instance: 'jenkins-agent'
+      - targets: ['172.31.26.199:9100'] #prod-nfs
+        labels:
+          instance: 'prod-nfs'
+      - targets: ['192.168.110.2:9100'] #rancher
+        labels:
+          instance: 'rancher'
+
+
+    - job_name: blackbox
+      metrics_path: /probe
+      params:
+        module: [http_2xx]
+      static_configs:
+      - targets:
+        - https://example.com
+        - https://app.example.com
+      relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: target
+      - target_label: __address__
+        replacement: blackbox.grafana.svc.cluster.local:9115
+
+  service:
+    type: ClusterIP
+
+
+alertmanager:
+  ## Deploy alertmanager
+  enabled: false

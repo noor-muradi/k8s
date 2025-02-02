@@ -1,0 +1,171 @@
+apiVersion: elasticsearch.k8s.elastic.co/v1
+kind: Elasticsearch
+metadata:
+  name: elastic
+  namespace: elk
+spec:
+  version: 8.11.4
+  secureSettings:
+  - secretName: s3-creds
+  nodeSets:
+  - name: default
+    count: 2
+    podTemplate:
+      spec:
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+              - matchExpressions:
+                - key: eks.amazonaws.com/nodegroup
+                  operator: In
+                  values:
+                  - public-ng
+        initContainers:
+        - name: install-plugins
+          command:
+          - sh
+          - -c
+          - |
+            bin/elasticsearch-plugin install --batch repository-s3  
+        containers:
+        - name: elasticsearch
+          resources:
+            requests:
+              memory: 2Gi
+              cpu: 764m
+            limits:
+              memory: 6.5Gi
+              cpu: 1.2
+    volumeClaimTemplates:
+    - metadata:
+        name: elasticsearch-data # Do not change this name unless you set up a volume mount for the data path.
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi
+        storageClassName: nfs
+
+    config:
+      node.store.allow_mmap: false
+  http:
+    service:
+      spec:
+        type: ClusterIP
+---
+
+
+apiVersion: kibana.k8s.elastic.co/v1
+kind: Kibana
+metadata:
+  namespace: elk
+  name: kibana
+spec:
+  podTemplate:
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: eks.amazonaws.com/nodegroup
+                operator: In
+                values:
+                - public-ng
+      containers:
+      - name: kibana
+        resources:
+          requests:
+            cpu: 128m
+            memory: 512Mi
+          limits:
+            memory: 1.5Gi
+            cpu: 768m
+        env:
+        - name: XPACK_APM_SERVICEMAPENABLED
+          value: "true"
+        - name: XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY
+          value: "918d812b170549a3c07e4b7e19655109"
+  version: 8.11.4
+  count: 2
+  config:
+    server.publicBaseUrl: https://elastic.example.com:443
+  elasticsearchRef:
+    name: elastic
+  http:
+    service:
+      spec:
+        type: ClusterIP
+    tls:
+      selfSignedCertificate:
+        disabled: true
+---
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kibana-ingress
+  namespace: elk
+  annotations:
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:xxxx
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    alb.ingress.kubernetes.io/group.name: "group_name"
+    alb.ingress.kubernetes.io/healthcheck-path: "/login"
+    alb.ingress.kubernetes.io/load-balancer-attributes: routing.http2.enabled=true
+    alb.ingress.kubernetes.io/load-balancer-attributes: deletion_protection.enabled=true
+spec:
+  ingressClassName: alb
+  tls:
+  - hosts:
+    - elastic.example.com
+  rules:
+  - host: elastic.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: kibana-kb-http
+            port:
+              number: 5601
+
+
+---
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: elastic-ingress
+  namespace: elk
+  annotations:
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:xxxx
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 9200},{"HTTPS": 9200}]'
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/backend-protocol: HTTPS
+    alb.ingress.kubernetes.io/server-tls-verify: "false"
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    alb.ingress.kubernetes.io/group.name: "group_name"
+    alb.ingress.kubernetes.io/healthcheck-path: "/favicon.ico"
+spec:
+  ingressClassName: alb
+  tls:
+  - hosts:
+    - elastic.example.com
+  rules:
+  - host: elastic.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: elastic-es-http
+            port:
+              number: 9200

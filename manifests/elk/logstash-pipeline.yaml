@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: logstash-pipeline
+  namespace: elk
+stringData:
+  pipelines.yml: |-
+    - pipeline.id: main
+      config.string: |
+        input {
+          beats {
+            port => 5044
+          }
+        }
+
+        filter {
+            grok {
+                match => { "message" => "%{IPORHOST:clientip} - %{DATA:user_name} \[%{HTTPDATE:time}\] \"%{WORD:method}%{DATA:url} HTTP/%{NUMBER:http_version}\" %{NUMBER:response_code} %{NUMBER:body_sent:bytes} \"%{DATA:referrer}\" \"%{DATA:agent}\"" }
+            }
+
+            if [clientip] =~ "^10.0.*" or [clientip] =~ "^127.0.*" or [clientip] == "0.0.0.0" {
+                mutate {
+                    add_tag => ["internal"]
+                }
+            }
+
+            if "internal" not in [tags] {
+                geoip {
+                    default_database_type => "City"
+                    source => "clientip"
+                    target => "geoip"
+                    tag_on_failure => ["geoip-city-failed"]
+                }
+                geoip {
+                    default_database_type => "ASN"
+                    source => "clientip"
+                    target => "geoip"
+                    tag_on_failure => ["geoip-asn-failed"]
+                }
+            }
+        }
+
+        output {
+          elasticsearch {
+            hosts => "${TEST_ES_HOSTS}"
+            index => "beat-k8s"
+            user => "$uername"
+            password => "$password"
+            ssl => true
+            ssl_certificate_authorities => "${TEST_ES_SSL_CERTIFICATE_AUTHORITY}"
+          }
+        }
+

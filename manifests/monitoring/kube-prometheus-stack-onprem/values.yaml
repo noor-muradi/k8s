@@ -1,0 +1,194 @@
+### Grafana Section ###
+grafana:
+  enabled: true
+  namespaceOverride: ""
+
+  image:
+    registry: docker.io
+    repository: grafana/grafana
+    tag: "10.4.1"
+
+  grafana.ini:
+    server:
+      root_url: https://grafana.example.com
+      enable_gzip: true
+    wall: true
+
+    smtp:
+      enabled: true
+      host: email-smtp.us-east-1.amazonaws.com:587
+      from_address: "grafana@example.com"
+      from_name: "Umety Grafana"
+      startTLS_policy: "MandatoryStartTLS"
+      skip_verify: true
+  smtp:
+    existingSecret: "grafana-smtp"
+    userKey: "user"
+    passwordKey: "password"
+    
+  persistence:
+    enabled: true
+    existingClaim: "grafana-pvc"
+    accessModes:
+    - ReadWriteMany
+
+  #initChownData:
+  #enabled: false
+
+  resources:
+    requests:
+      memory: 512Mi
+      cpu: 128m
+    limits:
+      memory: 1Gi
+      cpu: 256m
+
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: eks.amazonaws.com/nodegroup
+            operator: In
+            values:
+            - public-ng #node group name
+  service:
+    type: "NodePort"
+
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+      - name: 'grafana-dashboards-kubernetes'
+        orgId: 1
+        folder: 'Kubernetes'
+        type: file
+        disableDeletion: true
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/grafana-dashboards-kubernetes
+  dashboards:
+    grafana-dashboards-kubernetes:
+      k8s-system-api-server:
+        url: https://raw.githubusercontent.com/dotdc/grafana-dashboards-kubernetes/master/dashboards/k8s-system-api-server.json
+        token: ''
+      k8s-system-coredns:
+        url: https://raw.githubusercontent.com/dotdc/grafana-dashboards-kubernetes/master/dashboards/k8s-system-coredns.json
+        token: ''
+      k8s-views-global:
+        url: https://raw.githubusercontent.com/dotdc/grafana-dashboards-kubernetes/master/dashboards/k8s-views-global.json
+        token: ''
+      k8s-views-namespaces:
+        url: https://raw.githubusercontent.com/dotdc/grafana-dashboards-kubernetes/master/dashboards/k8s-views-namespaces.json
+        token: ''
+      k8s-views-nodes:
+        url: https://raw.githubusercontent.com/dotdc/grafana-dashboards-kubernetes/master/dashboards/k8s-views-nodes.json
+        token: ''
+      k8s-views-pods:
+        url: https://raw.githubusercontent.com/dotdc/grafana-dashboards-kubernetes/master/dashboards/k8s-views-pods.json
+        token: ''
+
+  #default passowrd
+  adminPassword: password@123
+
+  #disable default dashboard
+  sidecar:
+    dashboards:
+      enabled: false
+    datasources:
+      enabled: true
+      defaultDatasourceEnabled: true
+      isDefaultDatasource: true
+      uid: prometheus
+      alertmanager:
+        enabled: false
+
+defaultRules:
+  create: false
+
+
+#### Prometheus Section ###
+
+prometheus:
+  enabled: true
+
+  prometheusSpec:
+    ## Image of Prometheus.
+    image:
+      registry: quay.io
+      repository: prometheus/prometheus
+      tag: v2.48.1
+      sha: ""
+    ## How long to retain metrics
+    retention: "10d"
+    ## Maximum size of metrics
+    retentionSize: "30GB"
+
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: eks.amazonaws.com/nodegroup
+              operator: In
+              values:
+              - public-ng #node group name
+
+
+    storageSpec:
+      volumeClaimTemplate:
+        metadata:
+          name: prometheus-pvc
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+
+    resources:
+      requests:
+        memory: 512Mi
+        cpu: 128m
+      limits:
+        memory: 1.5Gi
+        cpu: 256m
+        
+    additionalScrapeConfigs:
+
+    - job_name: node
+      scrape_interval: 5s
+      static_configs:
+      - targets: ['172.31.41.143:9100'] #EC201
+        labels:
+          instance: 'My-EC2-1'
+      - targets: ['172.x.x.x:9100'] #EC02
+        labels:
+          instance: 'My-EC2-2'
+
+    - job_name: blackbox
+      metrics_path: /probe
+      params:
+        module: [http_2xx]
+      static_configs:
+      - targets:
+        - https://example.com
+        - https://app.example.com
+      relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: target
+      - target_label: __address__
+        replacement: blackbox.grafana.svc.cluster.local:9115
+
+    - job_name: jenkins
+      metrics_path: /prometheus/
+      static_configs:
+      - targets: ["jenkins-svc.jenkins.svc"]
+
+  service:
+    type: NodePort
+    
+alertmanager:
+  ## Deploy alertmanager
+  enabled: false

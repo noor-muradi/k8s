@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: vas
+  name: vas
+  namespace: vas
+spec:
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 9392
+  selector:
+    app: vas

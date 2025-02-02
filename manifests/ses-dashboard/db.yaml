@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: ses-dash-db
+  name: ses-dash-db
+  namespace: ses
+spec:
+  selector:
+    matchLabels:
+      app: ses-dash-db
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: ses-dash-db
+      namespace: ses
+    spec:
+      containers:
+      - envFrom:
+        - secretRef:
+            name: ses-dash-db-secret
+        image: mariadb:lts
+        imagePullPolicy: IfNotPresent
+        name: ses-dash-db
+        ports:
+        - containerPort: 3306
+          name: ses-db-port
+          protocol: TCP
+        resources:
+          limits:
+            cpu: "512m"
+            memory: 2048Mi
+          requests:
+            cpu: 128m
+            memory: 512Mi
+        volumeMounts:
+        - mountPath: /var/lib/mysql
+          name: data
+        - mountPath: /etc/mysql/conf.d
+          name: config
+      restartPolicy: Always
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: ses-dash-db-pvc
+      - name: config
+        configMap:
+          name: ses-dash-db-configmap
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: ses-dash-db
+  name: ses-dash-db-svc
+  namespace: ses
+spec:
+  ports:
+  - name: ses-db-port
+    port: 3306
+    protocol: TCP
+    targetPort: 3306
+  selector:
+    app: ses-dash-db
+  type: ClusterIP
+

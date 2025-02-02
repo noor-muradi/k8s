@@ -1,0 +1,26 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: curl-google
+  namespace: default
+spec:
+  schedule: '* * * * *'
+  successfulJobsHistoryLimit: 3
+  suspend: false
+  concurrencyPolicy: Replace
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    metadata:
+      namespace: default
+    spec:
+      template:
+        metadata:
+        spec:
+          containers:
+          - args:
+            - curl
+            - https://google.com
+            image: curlimages/curl
+            imagePullPolicy: Always
+            name: container-0
+          restartPolicy: Never

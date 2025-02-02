@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ses-dash-php-fpm-configmap
+  namespace: ses
+data:
+  99-overrides.ini: |
+    upload_max_filesize = 100M
+    post_max_size = 108M
+
+

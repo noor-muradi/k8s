@@ -1,0 +1,21 @@
+apiVersion: kibana.k8s.elastic.co/v1
+kind: Kibana
+metadata:
+  namespace: elk
+  name: kibana
+spec:
+  podTemplate:
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: worker02
+  version: 8.9.1
+  count: 1
+  config:
+    server.publicBaseUrl: https://kibana.example.com:443
+  elasticsearchRef:
+    name: monitoring
+  http:
+    tls:
+      selfSignedCertificate:
+        disabled: true
+

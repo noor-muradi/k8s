@@ -1,0 +1,78 @@
+// create the ILM policy
+
+PUT _ilm/policy/example-alb-ilm-policy
+{
+  "policy": {
+    "phases": {
+      "hot": {
+        "actions": {
+          "rollover": {
+            "max_age": "15d",
+            "max_primary_shard_size": "15gb"
+          }
+        }
+      },
+      "warm": {
+        "min_age": "15d",
+        "actions": {
+          "allocate": {
+            "number_of_replicas": 0
+          }
+        }
+      },
+      "delete": {
+        "min_age": "30d",
+        "actions": {
+          "delete": {}
+        }
+      }
+    }
+  }
+}
+
+
+// create index template with required settings and mappings
+
+PUT _index_template/example-alb
+{
+  "index_patterns": [
+    "example-alb-*"
+  ],
+  "template": {
+    "settings": {
+      "index": {
+        "lifecycle": {
+          "name": "example-alb-ilm-policy",
+          "rollover_alias": "example-alb-alias"
+        },
+        "refresh_interval": "60s",
+        "number_of_shards": "2",
+        "number_of_replicas": "1"
+      }
+    },
+    "mappings": {
+      "properties": {
+        "geoip": {
+          "properties": {
+            "location": {
+              "type": "geo_point"
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+
+// create the empty indice:
+
+PUT example-alb-0000001
+{
+  "aliases": {
+    "example-alb-alias": {
+      "is_write_index": true
+    }
+  }
+}
+

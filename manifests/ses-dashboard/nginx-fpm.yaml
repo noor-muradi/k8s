@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ses-dash-nginx
+  namespace: ses
+spec:
+  selector:
+    matchLabels:
+      app: ses-dash-nginx
+  template:
+    metadata:
+      labels:
+        app: ses-dash-nginx
+    spec:
+      containers:
+      - name: ses-nginx
+        image: nginx
+        resources:
+          limits:
+            memory: "500Mi"
+            cpu: "256m"
+        volumeMounts:
+        - mountPath: /etc/nginx/conf.d/default.conf
+          name: nginx-config
+          subPath: default.conf
+        - mountPath: /application
+          name: app
+        ports:
+        - containerPort: 80
+      - name: ses-php-fpm
+        image: <my-repo>/ses-dash/php-fpm:latest
+        imagePullPolicy: Always
+        resources:
+          limits:
+            memory: "500Mi"
+            cpu: "256m"
+        envFrom:
+        - secretRef:
+            name: ses-dash-app-secret
+        ports:
+        - containerPort: 9000
+        volumeMounts:
+        - name: app
+          mountPath: /application
+        - name: fpm-config
+          mountPath: /etc/php/8.1/fpm/conf.d/99-overrides.ini
+          subPath: 99-overrides.ini
+
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: ses-dash-nginx-configmap
+      - name: fpm-config
+        configMap:
+          name: ses-dash-php-fpm-configmap
+      - name: app
+        persistentVolumeClaim:
+          claimName: ses-dash-app-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ses-dash-nginx
+  namespace: ses
+  labels:
+    app: ses-dash-nginx
+spec:
+  ports:
+  - port: 80
+    targetPort: 80
+  selector:
+    app: ses-dash-nginx

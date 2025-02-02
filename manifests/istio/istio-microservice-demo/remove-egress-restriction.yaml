@@ -1,0 +1,13 @@
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-all-egress
+  namespace: your-namespace # Replace with your namespace
+spec:
+  selector:
+    matchLabels: {}
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        notNamespaces: ["your-namespace"] # Replace with your namespace

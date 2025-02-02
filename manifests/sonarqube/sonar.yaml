@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: sonarqube      
+  labels:
+    app: sonarqube
+  name: sonarqube
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sonarqube
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: sonarqube
+    spec:
+      containers:
+      - image: sonarqube:10-community
+        name: sonarqube
+        resources:
+          requests:
+             cpu: 128m
+             memory: 256Mi
+          limits:
+             cpu: 1
+             memory: 1Gi
+        envFrom:
+          - secretRef:
+              name: sonar-secret      
+        ports:
+          - containerPort: 9000     
+        volumeMounts:         
+          - name: sonar-data
+            mountPath: /opt/sonarqube/data
+          - name: sonar-ext
+            mountPath: /opt/sonarqube/extensions
+          - name: sonar-logs
+            mountPath: /opt/sonarqube/logs      
+        resources: {}
+      
+      volumes:
+        - name: sonar-data
+          persistentVolumeClaim:
+             claimName: sonar-data-pvc
+        - name: sonar-ext
+          persistentVolumeClaim:
+             claimName: sonar-ext-pvc
+        - name: sonar-logs
+          persistentVolumeClaim:
+             claimName: sonar-log-pvc
+
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: sonarqube
+  name: sonarqube-svc
+  namespace: sonarqube
+spec:
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 9000
+  selector:
+    app: sonarqube

@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: event-exporter-cfg
+  namespace: monitoring
+data:
+  config.yaml: |
+    logLevel: warn
+    logFormat: json
+    metricsNamePrefix: event_exporter_
+    route:
+      routes:
+        - match:
+            - receiver: "dump"
+    receivers:
+      - name: "dump"
+        elasticsearch:
+          hosts:
+            - https://elastic.example.com:9200
+          index: kube-events-alias
+          username: k8s-events-exporter
+          password: abc@123
+          useEventID: true

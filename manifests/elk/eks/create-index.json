@@ -1,0 +1,19 @@
+PUT /aws-alb
+{
+  "settings": {
+    "refresh_interval": "60s"
+    "number_of_shards": 2,
+    "number_of_replicas": 1
+  },
+  "mappings": {
+    "properties": {
+      "geoip": {
+        "properties": {
+          "location": {
+            "type": "geo_point"
+          }
+        }
+      }
+    }
+  }
+}

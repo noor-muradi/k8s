@@ -1,0 +1,80 @@
+
+# single condition using match
+GET index/_search
+{
+  "query": {
+    "match": {
+      "description": "quick brown fox"
+    }
+  }
+}
+
+# multi condition using match
+GET index/_search
+{
+  "_source": ["geoip.country_name", "geoip.city_name"], #use _source for filtering the result
+  "query": {
+    "bool": {
+      "must": [
+        {
+          "match": {
+            "geoip.country_name": "United States"  
+          }
+        },
+        {
+          "match": {
+            "geoip.city_name": "New York"
+          }
+        }
+      ]
+    }
+  }
+}
+
+
+#single condition query using term
+GET index/_search
+{
+  "query": {
+    "term": {
+      "domain.keyword": "api.example.com"  
+    }
+  }
+}
+
+
+# multi condition query using term
+GET index/_search?pretty=true
+{
+  "_source": ["domain", "geoip.country_name", "status", "http_uri", "http_method"], 
+  "query": {
+    "bool": { 
+      "must": [
+        {
+          "term": {
+            "domain.keyword": "app.example.com"
+          }
+        },
+        {
+          "term": {
+            "geoip.country_name.keyword": "United States"
+          }
+        },
+        {
+          "term": {
+            "status": {
+              "value": "404"
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+
+# sql querry 
+POST _sql?format=txt
+{
+  "query": "SELECT status, domain, geoip.country_name, http_uri FROM \"index-name\" WHERE domain = 'app.example.com' AND geoip.country_name = 'United States'"
+}
+

@@ -1,0 +1,26 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: example-ingress
+  namespace: test
+spec:
+  podSelector: {} # all pods in "test" namespace
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: In
+          values: ["default","local"]
+    - ipBlock:
+        cidr: 10.0.1.0/24
+        except:
+        - 10.0.1.2/32
+
+# Namespace-Based Access: Pods in the test namespace can accept traffic from pods in namespaces "default" and "local".
+# IP-Based Access: Pods in the test namespace can accept traffic from IP addresses within the range 10.0.1.0/24, except the IP address 10.0.1.2.
+        
+
+

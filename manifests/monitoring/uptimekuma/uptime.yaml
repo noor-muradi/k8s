@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: uptimekuma
+  labels:
+    app: uptimekuma
+  namespace: uptimekuma
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: uptimekuma
+  template:
+    metadata:
+      labels:
+        app: uptimekuma
+    spec:
+      containers:
+      - name: uptimekuma
+        image: louislam/uptime-kuma:latest
+        resources:
+          requests:
+            cpu: 128m
+            memory: 256Mi
+          limits:
+            cpu: 0.5
+            memory: 0.5Gi
+        ports:
+        - containerPort: 3001
+        volumeMounts:
+          - name: uptimekuma-pv
+            mountPath: /app/data
+      volumes:
+      - name: uptimekuma-pv
+        persistentVolumeClaim:
+          claimName: uptimekuma-pvc
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: uptimekuma-svc
+  labels:
+    app: uptimekuma
+  namespace: uptimekuma
+spec:
+  ports:
+    - port: 80
+      targetPort: 3001
+  selector:
+    app: uptimekuma
+  type: ClusterIP
+

@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: wordpress
+  name: wp
+  labels:
+    app: wp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wp
+  template:
+    metadata:
+      labels:
+        app: wp
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+                - key: disktype
+                  operator: In
+                  values:
+                  - ssd        
+    # nodeSelector:
+      # disktype: ssd               
+      containers:
+      - name: wp
+        image: wordpress
+        ports:
+        - containerPort: 80
+        volumeMounts:
+          - name: pv01
+            mountPath: /var/www/html
+        resources:
+          requests:
+            cpu: "128m"
+            memory: "256Mi"
+          limits:
+            cpu: "256m"
+            memory: "512Mi"  
+        envFrom:
+          - secretRef:
+              name: wp-secret
+        livenessProbe:
+          failureThreshold: 12
+          httpGet:
+            path: /
+            port: 80
+            httpHeaders:
+             - name: X-Forward-Proto
+               value: https
+             - name: X-Forward-Host
+               value: wp.com
+          initialDelaySeconds: 180
+          periodSeconds: 15
+          timeoutSeconds: 10
+        readinessProbe:
+          failureThreshold: 12
+          httpGet:
+            path: /
+            port: 80
+            httpHeaders:
+             - name: X-Forward-Proto
+               value: https
+             - name: X-Forward-Host
+               value: wp.com
+          initialDelaySeconds: 180
+          periodSeconds: 15
+          timeoutSeconds: 10
+          failureThreshold: 12 
+      initContainers:
+      - name: init-container
+        image: busybox
+        command:
+          ['sh', '-c', "until nslookup mysql-svc.$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace).svc.cluster.local; do echo waiting for mysql-svc; sleep 2; done"]          
+      volumes:
+      - name: pv01
+        persistentVolumeClaim:
+          claimName: wp-vc
