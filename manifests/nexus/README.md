@@ -31,18 +31,17 @@ kubectl create secret generic nexus-encryption-key --from-file=key.json
 kubectl create -f .
 ```
 
-4. Access the Nexus GUI and set create repos i.e Docker repo:
+4. Access the Nexus GUI and to create first repo i.e Docker repo:
 
-  a. After login, click on gear icon > `Repository` > `Create Repository`:
-     Select `docker hosted` > Enter port HTTP `5000`. > Click on `Create Repository`.
+      a. After login, click on gear icon > `Repository` > `Create Repository`:
+         Select `docker hosted` > Enter port HTTP `5000`. > Click on `Create Repository`.
 
-  b. On your system authenticate docker to Nexus repo, run below command to login:
-      ```
-      docker login nexus.example.com:5000
-      ```
-  c. Push image to Nexus created repo:
+      b. On your system authenticate docker to Nexus repo, run below command to login:
+        ```
+        docker login nexus.example.com:5000
+        ```
+      c. Push image to Nexus created repo:
 
-      ```
-      docker push nexus.example.com:5000/repository/example/image:tag
-      ```    
-    
+        ```
+        docker push nexus.example.com:5000/repository/example/image:tag
+        ```    
