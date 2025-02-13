@@ -4,11 +4,9 @@ metadata:
   name: nexus-docker-svc
   namespace: nexus
 spec:
-  type: NodePort
   ports:
   - name: docker
     port: 5000
     targetPort: 5000
-    nodePort: 32700
   selector:
     app: nexus
