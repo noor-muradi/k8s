@@ -25,7 +25,7 @@ Copy the base64 encoded secret key and create the Nexus encryption key as below:
 kubectl create secret generic nexus-encryption-key --from-file=key.json
 ```
 
-3. create Secret, Configmap, PersistentVolume, Persistent Volume Claim, Deployment, and Ingress objects.
+3. Deploy and create Secret, Configmap, PersistentVolume, Persistent Volume Claim, Deployment, and Ingress objects.
 
 ```
 kubectl create -f .
