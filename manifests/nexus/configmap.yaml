@@ -1,0 +1,8 @@
+apiVersion: v1
+data:
+  nexus.properties: |
+    nexus.secrets.file=/nexus-data/encryptionkey.json
+kind: ConfigMap
+metadata:
+  name: nexus-properties-config
+  namespace: nexus
