@@ -40,6 +40,7 @@ kubectl create -f .
         ```
         docker login nexus.example.com:5000
         ```
+   
       c. Push image to Nexus created repo:
 
         ```
