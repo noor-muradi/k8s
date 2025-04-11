@@ -1,0 +1,168 @@
+image:
+  pullPolicy: IfNotPresent
+  registry: docker.io
+  repository: falcosecurity/falco
+
+rbac:
+  create: true
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 128Mi
+  limits:
+    cpu: 200m
+    memory: 1024Mi
+
+tolerations:
+  - effect: NoSchedule
+    key: node-role.kubernetes.io/master
+  - effect: NoSchedule
+    key: node-role.kubernetes.io/control-plane
+
+tty: true
+
+
+controller:
+  kind: daemonset
+  daemonset:
+    updateStrategy:
+      type: RollingUpdate
+  deployment:
+    replicas: 1
+services:
+  # Example configuration for the "k8sauditlog" plugin
+  # - name: k8saudit-webhook
+  #   type: NodePort
+  #   ports:
+  #     - port: 9765 # See plugin open_params
+  #       nodePort: 30007
+  #       protocol: TCP
+
+mounts:
+  volumes:
+    - name: falco-logs
+      hostPath:
+        path: /var/log
+        type: Directory
+  volumeMounts:
+    - name: falco-logs
+      mountPath: /var/log
+
+driver:
+  enabled: true
+  # -- kind tells Falco which driver to use. Available options: kmod (kernel driver), ebpf (eBPF probe), modern_ebpf (modern eBPF probe).
+  kind: auto
+  loader:
+    enabled: true
+    initContainer:
+      image:
+        pullPolicy: IfNotPresent
+        registry: docker.io
+        repository: falcosecurity/falco-driver-loader
+        tag: ""
+
+collectors:
+  enabled: true
+
+  docker:
+    enabled: false
+    socket: /var/run/docker.sock
+
+  containerd:
+    enabled: true
+    socket: /run/containerd/containerd.sock
+
+customRules:
+  {}
+falcosidekick:
+  enabled: false
+  fullfqdn: false
+  # -- Listen port. Default value: 2801
+  listenPort: ""
+falcoctl:
+  image:
+    pullPolicy: IfNotPresent
+    registry: docker.io
+    repository: falcosecurity/falcoctl
+    tag: "0.11.0"
+  artifact:
+    install:
+      enabled: false
+    follow:
+      enabled: false
+  config:
+    artifact:
+      allowedTypes:
+        - rulesfile
+        - plugin
+      install:
+        enabled: false
+        resolveDeps: false
+        refs: []
+      follow:
+        refs: []
+falco:
+  rules_files:
+    - /etc/falco/falco_rules.yaml
+    - /etc/falco/falco_rules.local.yaml
+    - /etc/falco/rules.d
+
+  config_files:
+    - /etc/falco/config.d
+
+  watch_config_files: true
+
+  ##########################
+  # Falco outputs settings #
+  ##########################
+  
+  time_format_iso_8601: false
+
+  priority: info
+  json_output: true
+  json_include_output_property: true
+  json_include_tags_property: true
+  json_include_message_property: false
+  buffered_outputs: false
+  append_output: []
+
+  ##########################
+  # Falco outputs channels #
+  ##########################
+  stdout_output:
+    enabled: true
+
+  syslog_output:
+    enabled: false
+
+  file_output:
+    enabled: true
+    keep_alive: false
+    filename: /var/log/falco.log
+
+  http_output:
+    enabled: false
+    url: ""
+    user_agent: "falcosecurity/falco"
+    insecure: false
+    ca_cert: ""
+    ca_bundle: ""
+    ca_path: "/etc/falco/certs/"
+    mtls: false
+    client_cert: "/etc/falco/certs/client/client.crt"
+    client_key: "/etc/falco/certs/client/client.key"
+    # -- Whether to echo server answers to stdout
+    echo: false
+    # -- compress_uploads whether to compress data sent to http endpoint.
+    compress_uploads: false
+    # -- keep_alive whether to keep alive the connection.
+    keep_alive: false
+
+  program_output:
+    enabled: false
+    keep_alive: false
+    program: "jq '{text: .output}' | curl -d @- -X POST https://hooks.slack.com/services/XXX"
+
+  grpc_output:
+    enabled: false
