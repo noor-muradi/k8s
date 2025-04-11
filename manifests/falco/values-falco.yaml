@@ -73,8 +73,45 @@ collectors:
     enabled: true
     socket: /run/containerd/containerd.sock
 
+
 customRules:
-  {}
+  suspicious.rules: |-
+    - rule: Write below /bin or /sbin
+      desc: Detect any write below /bin or /sbin (possible malware or binary tampering)
+      condition: evt.type in (open, openat, creat) and fd.name startswith /bin and evt.dir=< and open_write
+      output: "File below /bin or /sbin written (user=%user.name command=%proc.cmdline file=%fd.name)"
+      priority: Critical
+      tags: [filesystem, security, tampering]
+
+    - rule: Write File in /etc Directory
+      desc: Detect file creation or modification in /etc directory
+      condition: evt.type in (open, openat, creat) and fd.name startswith "/etc" and open_write
+      output: "File write in /etc directory (command=%proc.cmdline user=%user.name file=%fd.name container_id=%container.id)"
+      priority: Warning
+      tags: [filesystem, etc, write]
+
+    - rule: List /var/log
+      desc: Detect open of /var/log directory
+      condition: fd.name="/var/log" and evt.type in (open, openat)
+      output: "Access to /var/log (user=%user.name command=%proc.cmdline)"
+      priority: Warning
+      tags: [filesystem, audit]
+
+    - rule: Unexpected Network Tool Execution
+      desc: Detect execution of networking tools in a container
+      condition: container and evt.type=execve and proc.name in (curl, wget, nc, netcat, nmap)
+      output: "Unexpected network tool in container (user=%user.name command=%proc.cmdline)"
+      priority: Warning
+      tags: [network, suspicious]
+
+    - rule: Execution from /tmp
+      desc: Detect execution of a binary from /tmp
+      condition: evt.type=execve and proc.exepath startswith "/tmp" and proc.name != "falco"
+      output: "Execution from /tmp detected (user=%user.name path=%proc.exepath cmdline=%proc.cmdline)"
+      priority: Critical
+      tags: [tmp, malware, execution]
+
+
 falcosidekick:
   enabled: false
   fullfqdn: false
@@ -116,7 +153,8 @@ falco:
   ##########################
   # Falco outputs settings #
   ##########################
-  
+
+
   time_format_iso_8601: false
 
   priority: info
