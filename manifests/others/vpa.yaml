@@ -1,0 +1,16 @@
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: my-app-vpa
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: my-app
+  resourcePolicy:
+    containerPolicies:
+      - containerName: '*'
+        minAllowed:
+          memory: 200Mi
+        maxAllowed:
+          memory: 2Gi  # Max memory that VPA can scale up to
